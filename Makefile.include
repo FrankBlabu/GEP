@@ -1,0 +1,104 @@
+#
+# Makefile.include
+#
+# Common definitions included by all project libraries
+#
+
+BINDIR  = $(PWD)/build/bin
+LIBDIR  = $(PWD)/build/lib
+INCDIR  = $(PWD)/build/include
+OBJDIR  = $(PWD)/build/obj/$(LIBRARY)
+TESTDIR = $(PWD)/build/test
+
+TARGET = $(LIBDIR)/libGEP$(LIBRARY).so
+OBJ  = ${SRC:%.cpp=${OBJDIR}/%.o}
+
+UI_HEADER = ${UI_SRC:%.ui=$(OBJDIR)/%.hpp}
+MOC_IMPL  = ${MOC_SRC:%.hpp=$(OBJDIR)/%_moc.cpp}
+MOC_OBJ   = ${MOC_IMPL:%.cpp=%.o}
+
+TEST_EXE = ${TEST_SRC:%.cpp=%}
+
+GEPLIBS = -lGEPSystem -lGEPCore -lGEPDisplay -lGEPDiagram
+
+BOOSTDIR = /usr
+QTDIR    = /usr
+
+CC   = g++
+CP   = cp
+LINK = g++
+LN   = ln
+MV   = mv
+RM   = rm
+TAR  = tar
+
+MOC  = $(QTDIR)/bin/moc
+UIC  = $(QTDIR)/bin/uic
+
+INCLUDEDIRS   = -I$(PWD)/build/include \
+                -I/usr/include/qt4 \
+                -I$(BOOSTDIR)/include/boost
+LIBDIRS       = -L$(PWD)/build/lib \
+                -L/usr/lib
+
+COMMONFLAGS   = -Werror
+DEBUGFLAGS    = -Wall -g
+OPTIMIZEFLAGS =
+
+CFLAGS = -fPIC $(INCLUDEDIRS) $(DEBUGFLAGS) $(OPTIMIZEFLAGS) $(COMMONFLAGS)
+LFLAGS = -fPIC $(LIBDIRS)
+
+SYSTEMLIBS = -lQtGui -lQtCore \
+             -lpng -lSM -lICE -lXi -lXrender -lXrandr -lXcursor -lXinerama \
+             -lfreetype -lfontconfig -lXext -lX11 -lpthread -lz -lm -ldl
+
+TEST_LIBS = -lGEP$(LIBRARY) $(SYSTEMLIBS)
+
+#
+# Global rules
+#
+all: depend $(TARGET)
+
+$(TARGET): $(UI_HEADER) $(OBJ) $(MOC_OBJ)
+	$(LINK) -shared $(LFLAGS) -o $@ $(OBJ) $(MOC_OBJ) $(LIBS)
+
+depend:
+	if [ ! -d $(OBJDIR) ]; then \
+	  mkdir $(OBJDIR); \
+	fi
+	$(CC) -M $(INCLUDEDIRS) $(SRC) >.depend
+	if [ "$(INCS)" != "" ]; then \
+	  for INC in $(INCS); \
+	  do \
+	    $(RM) -f $(INCDIR)/$$INC; \
+	    $(LN) -s `pwd`/$$INC $(INCDIR)/$$INC ; \
+	  done; \
+	fi
+
+library-clean:
+	if [ "$(INCS)" != "" ]; then \
+	  for INC in $(INCS); \
+	  do \
+	    $(RM) -f $(INCDIR)/$$INC; \
+	  done; \
+	fi
+	$(RM) -f .depend
+	$(RM) -f $(TARGET) $(OBJ) $(TEST_EXE)
+	$(RM) -f $(UI_HEADER) $(MOC_IMPL) $(MOC_OBJ)
+
+$(OBJDIR)/%.o: %.cpp
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+%.o: %.cpp
+	$(CC) -c $(CFLAGS) -o $@ $<
+
+$(OBJDIR)/%.hpp: %.ui
+	$(UIC) -o $@ $<
+
+$(OBJDIR)/%_moc.cpp: %.hpp
+	$(MOC) $(INCLUDEDIRS) -o $@ $<
+
+test: $(TEST_EXE)
+
+test_%: test_%.cpp
+	$(CC) $(CFLAGS) $(LFLAGS) -o $@ $< $(TEST_LIBS)
